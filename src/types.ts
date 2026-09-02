@@ -13,5 +13,6 @@ export interface Message{
   clarify?:ClarifyQ[]
   result?:CreateResult
   streaming?:boolean
+  clarifyConsumed?:boolean
 }
 export interface VaultItem{id:string;prompt:string;domain:Domain;createdAt:number}

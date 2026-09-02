@@ -13,6 +13,8 @@ import { Particles } from "@/components/ui/particles"
 type ChatSession={id:string;title:string;domain:Domain;messages:Message[];createdAt:number;updatedAt:number}
 type AppUser={name:string;email:string}
 
+const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).substring(2))
+
 const spring={type:"spring" as const,stiffness:400,damping:25}
 const stagger={animate:{transition:{staggerChildren:0.07,delayChildren:0.08}}}
 const fadeUp={initial:{opacity:0,y:10},animate:{opacity:1,y:0},transition:spring}
@@ -33,18 +35,18 @@ function BoldText({text,domain}:{text:string;domain?:Domain}){
   })}</>
 }
 function GlassCategoryCard({c,domain,onSelect}:{c:typeof CATEGORIES[number];domain:Domain;onSelect:(d:Domain)=>void}){
-  const ref=useRef<HTMLButtonElement>(null)
+  const innerRef=useRef<HTMLDivElement>(null)
   const onMove=(e:React.MouseEvent)=>{
-    const el=ref.current; if(!el) return;
+    const el=innerRef.current; if(!el) return;
     const r=el.getBoundingClientRect(); el.style.setProperty("--mx",`${e.clientX-r.left}px`); el.style.setProperty("--my",`${e.clientY-r.top}px`)
     const cx=r.width/2, cy=r.height/2
     const rx=(e.clientY-r.top-cy)/14, ry=(cx-(e.clientX-r.left))/14
     el.style.transform=`perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(6px)`
   }
-  const onLeave=()=>{ if(ref.current) ref.current.style.transform=`perspective(900px) rotateX(0) rotateY(0) translateZ(0)`}
+  const onLeave=()=>{ if(innerRef.current) innerRef.current.style.transform=`perspective(900px) rotateX(0) rotateY(0) translateZ(0)`}
   return (
-    <motion.button ref={ref} onMouseMove={onMove} onMouseLeave={onLeave} variants={fadeUp} whileTap={{scale:0.97}} transition={spring} onClick={()=>onSelect(c.id)}
-      className={cn("spotlight text-left p-6 rounded-[28px] glass-strong min-h-[186px] flex flex-col justify-between group relative overflow-hidden text-slate-100 will-change-transform",
+    <motion.button variants={fadeUp} whileTap={{scale:0.97}} transition={spring} onClick={()=>onSelect(c.id)} className="p-0 bg-transparent border-0 w-full text-left">
+      <div ref={innerRef} onMouseMove={onMove} onMouseLeave={onLeave} className={cn("spotlight text-left p-6 rounded-[28px] glass-strong min-h-[186px] flex flex-col justify-between group relative overflow-hidden text-slate-100 will-change-transform",
       domain===c.id?'ring-1 ring-violet-400/40 border-violet-400/30 shadow-[0_0_40px_rgba(139,92,246,0.25)]':'border-white/10 hover:border-white/15')}>
       {domain===c.id && <BorderBeam size={220} duration={12} colorFrom="#8b5cf6" colorTo="#38bdf8" borderWidth={1.2} />}
       <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/[0.07] via-transparent to-transparent pointer-events-none" />
@@ -58,6 +60,7 @@ function GlassCategoryCard({c,domain,onSelect}:{c:typeof CATEGORIES[number];doma
         <div className="text-xs text-slate-400 mt-1 leading-relaxed">Optimized for {c.desc}</div>
       </div>
       <div className="text-xs text-slate-500 mt-4 group-hover:text-slate-200 flex items-center gap-1 transition">Start creating <span className="group-hover:translate-x-1 transition-transform">→</span></div>
+      </div>
     </motion.button>
   )
 }
@@ -74,8 +77,9 @@ export default function App(){
   const [toast,setToast]=useState("")
   const [streamText,setStreamText]=useState("")
   const [tweakFor,setTweakFor]=useState<string|null>(null)
-  const [tweakInput,setTweakInput]=useState("")
+  const [tweakInputs,setTweakInputs]=useState<Record<string,string>>({})
   const [sidebarOpen,setSidebarOpen]=useState(false)
+  const [searchQuery,setSearchQuery]=useState("")
   const [chats,setChats]=useState<ChatSession[]>(()=>{try{return JSON.parse(localStorage.getItem("bp_chats")||"[]")}catch{return []}})
   const [activeId,setActiveId]=useState<string|null>(null)
   const [user,setUser]=useState<AppUser|null>(()=>{try{return JSON.parse(localStorage.getItem("bp_user")||"null")}catch{return null}})
@@ -115,7 +119,7 @@ export default function App(){
 
   const persistMessages=(next:Message[], d:Domain|null)=>{
     if(!activeId){
-      const id=Date.now().toString()
+      const id=generateId()
       const title=next.find(m=>m.role==='user')?.text.slice(0,38) || "New chat"
       const ns:ChatSession={id,title,domain:d,messages:next,createdAt:Date.now(),updatedAt:Date.now()}
       setChats(prev=>[ns,...prev]); setActiveId(id)
@@ -126,10 +130,10 @@ export default function App(){
 
   const showToast=(m:string)=>{setToast(m);setTimeout(()=>setToast(""),2200)}
   const newChat=()=>{
-    const id=Date.now().toString()
+    const id=generateId()
     const ns:ChatSession={id,title:"New chat",domain:null,messages:[],createdAt:Date.now(),updatedAt:Date.now()}
     setChats(prev=>[ns,...prev]); setActiveId(id)
-    setMessages([]);setDomain(null);setPendingIdea("");setClarifyAnswers([]);setStreamText("");setTweakFor(null)
+    setMessages([]);setDomain(null);setPendingIdea("");setClarifyAnswers([]);setStreamText("");setTweakFor(null);setTweakInputs({})
     setSidebarOpen(false)
   }
   const handleCategory=(d:Domain)=>{
@@ -137,77 +141,113 @@ export default function App(){
     const nm:Message={id:"w",role:"assistant",text:`Great — ${d} mode activated. Describe your idea and I'll craft a hyper-detailed CREATE prompt.`,domain:d}
     const next=[nm]; setMessages(next); persistMessages(next,d)
   }
-  const handleSend=async(text?:string)=>{
-    const idea=(text||input).trim()
-    if(!idea) return
-    let currentDomain = domain
-    if(!currentDomain){
-      currentDomain = "code" as Domain
-      setDomain(currentDomain)
-    }
-    if(generations>=10){ showToast("Free limit reached — upgrade to Pro");return}
-    const userMsg:Message={id:Date.now().toString(),role:"user",text:idea,domain:currentDomain}
-    setMessages(prev=>{ const next=[...prev,userMsg]; persistMessages(next,currentDomain); return next })
-    setInput("");setPendingIdea(idea);setClarifyAnswers([])
-    try{
-      const qs=await generateClarify(idea,currentDomain)
-      const fallback = contextualClarify(idea, currentDomain)
-      const normalized = Array.isArray(qs) && (qs as any[]).length>0 && (qs as any[])[0]?.question
-        ? (qs as any[]).map((q:any)=>({question:String(q.question).trim(), pills: Array.isArray(q.pills)? q.pills : Array.isArray(q.options)? q.options : Array.isArray(q.answers)? q.answers : []})).filter((q:any)=>q.question)
-        : []
-      const validQs = normalized.length ? normalized : fallback
-      const safeQs = validQs.map((q:any)=>({question:q.question, pills: (q.pills && q.pills.length? q.pills : ["Option A","Option B","Option C"])}))
-      const bot:Message={id:(Date.now()+1).toString(),role:"assistant",text:"Got it — a couple quick questions to make it perfect:",clarify:safeQs}
-      setMessages(prev=>{ const next2=[...prev,bot]; persistMessages(next2,currentDomain); return next2 })
-      setTimeout(()=>scrollToBottom(true),50)
-      setTimeout(()=>scrollToBottom(true),300)
-    }catch(e){
-      console.warn("Primary clarify API failed, using fallback.", e)
-      const fallback = contextualClarify(idea, currentDomain)
-      const safeQs = fallback.map((q:any)=>({question:q.question, pills: (q.pills && q.pills.length? q.pills : ["Option A","Option B","Option C"])}))
-      const bot:Message={id:(Date.now()+1).toString(),role:"assistant",text:"Got it — a couple quick questions to make it perfect:",clarify:safeQs}
-      setMessages(prev=>{ const next2=[...prev,bot]; persistMessages(next2,currentDomain); return next2 })
-      setTimeout(()=>scrollToBottom(true),50)
-      setTimeout(()=>scrollToBottom(true),300)
+  const handleSend = async (text?: string) => {
+    const idea = (text || input).trim();
+    if (!idea) return;
+    
+    let currentDomain = domain || ("code" as Domain);
+    if (!domain) setDomain(currentDomain);
+    
+    if (generations >= 10) { showToast("Free limit reached — upgrade to Pro"); return; }
+
+    const chatIdToUse = activeId || generateId();
+    
+    const userMsg: Message = { id: generateId(), role: "user", text: idea, domain: currentDomain };
+    const nextMessages = [...messages, userMsg];
+    
+    setMessages(nextMessages);
+    
+    setChats(prev => {
+      const exists = prev.find(c => c.id === chatIdToUse);
+      if (!exists) {
+        return [{ id: chatIdToUse, title: idea.slice(0, 38), domain: currentDomain, messages: nextMessages, createdAt: Date.now(), updatedAt: Date.now() }, ...prev];
+      }
+      return prev.map(c => c.id === chatIdToUse ? { ...c, messages: nextMessages, domain: currentDomain, updatedAt: Date.now() } : c);
+    });
+    
+    if (!activeId) setActiveId(chatIdToUse);
+    setInput(""); setPendingIdea(idea); setClarifyAnswers([]);
+
+    try {
+      const qs = await generateClarify(idea, currentDomain);
+      const validQs = qs && qs.length ? qs : contextualClarify(idea, currentDomain);
+      const safeQs = validQs.map((q: any) => ({
+        question: q.question || "Could you clarify?",
+        pills: (q.pills && q.pills.length ? q.pills : ["Option A", "Option B", "Option C"])
+      }));
+      
+      const bot: Message = { id: generateId(), role: "assistant", text: "Got it — a couple quick questions to make it perfect:", clarify: safeQs };
+      
+      setMessages(prev => {
+        const finalMessages = [...prev, bot];
+        setChats(oldChats => oldChats.map(c => c.id === chatIdToUse ? { ...c, messages: finalMessages, updatedAt: Date.now() } : c));
+        return finalMessages;
+      });
+      setTimeout(() => scrollToBottom(true), 100);
+      
+    } catch (e) {
+      console.warn("API failed, using fallback.", e);
+      const fallback = contextualClarify(idea, currentDomain);
+      const safeQs = fallback.map((q: any) => ({
+        question: q.question,
+        pills: (q.pills && q.pills.length ? q.pills : ["Option A", "Option B", "Option C"])
+      }));
+      
+      const bot: Message = { id: generateId(), role: "assistant", text: "Got it — a couple quick questions to make it perfect:", clarify: safeQs };
+      
+      setMessages(prev => {
+        const finalMessages = [...prev, bot];
+        setChats(oldChats => oldChats.map(c => c.id === chatIdToUse ? { ...c, messages: finalMessages, updatedAt: Date.now() } : c));
+        return finalMessages;
+      });
+      setTimeout(() => scrollToBottom(true), 100);
     }
   }
   const pickPill=(qIdx:number,pill:string)=>{const next=[...clarifyAnswers];next[qIdx]=pill;setClarifyAnswers(next)}
   const handleCompile=async()=>{
     if(!pendingIdea||!domain) return
-    const um:Message={id:Date.now().toString(),role:"user",text:clarifyAnswers.filter(Boolean).join(" • ")||"Use best defaults"}
-    const mid=[...messages,um]; setMessages(mid); persistMessages(mid,domain)
+    if(generations>=10){ showToast("Free limit reached — upgrade to Pro");return}
+    const consumedMid=messages.map(m=> m.clarify ? {...m, clarifyConsumed:true} : m)
+    const um:Message={id:generateId(),role:"user",text:clarifyAnswers.filter(Boolean).join(" • ")||"Use best defaults"}
+    const mid=[...consumedMid,um]; setMessages(mid); persistMessages(mid,domain)
     setStreamText("Crafting your CREATE blueprint…")
     const res=await generateFinal(pendingIdea,domain,clarifyAnswers)
     let out="";for(const ch of res.prompt){ out+=ch; setStreamText(out); await new Promise(r=>setTimeout(r,5))}
     setStreamText("")
-    const bot:Message={id:Date.now().toString(),role:"assistant",text:"Here is your hyper-detailed CREATE prompt — ready to paste:",result:res,domain:domain!}
+    const bot:Message={id:generateId(),role:"assistant",text:"Here is your hyper-detailed CREATE prompt — ready to paste:",result:res,domain:domain!}
     const fin=[...mid,bot]; setMessages(fin); persistMessages(fin,domain); setGenerations(g=>g+1);setClarifyAnswers([])
   }
   const handleRegenerate=async()=>{
     if(!pendingIdea||!domain) return
+    if(generations>=10){ showToast("Free limit reached — upgrade to Pro");return}
     setStreamText("Regenerating…")
     const res=await generateFinal(pendingIdea,domain,clarifyAnswers)
     let out=""; for(const ch of res.prompt){ out+=ch; setStreamText(out); await new Promise(r=>setTimeout(r,4))}
     setStreamText("")
-    const bot:Message={id:Date.now().toString(),role:"assistant",text:"Here's a fresh variation:",result:res,domain:domain!}
+    const bot:Message={id:generateId(),role:"assistant",text:"Here's a fresh variation:",result:res,domain:domain!}
     const fin=[...messages,bot]; setMessages(fin); persistMessages(fin,domain); setGenerations(g=>g+1)
   }
   const handleTweak=async(id:string, prompt:string)=>{
-    if(!tweakInput.trim()) return
-    const tweaked=await tweakPrompt(prompt,tweakInput)
+    const cur=(tweakInputs[id]||"").trim()
+    if(!cur) return
+    const tweaked=await tweakPrompt(prompt,cur)
     const upd=messages.map(x=> x.id===id && x.result ? {...x,result:{...x.result,prompt:tweaked}} : x)
-    setMessages(upd); persistMessages(upd,domain); setTweakFor(null);setTweakInput("");showToast("Prompt tweaked")
+    setMessages(upd); persistMessages(upd,domain); setTweakFor(null); setTweakInputs(p=>{const n={...p}; delete n[id]; return n});showToast("Prompt tweaked")
   }
   const copy=(t:string)=>{navigator.clipboard.writeText(t);showToast("Copied to clipboard")}
-  const save=(p:string,d:Domain)=>{setVault(v=>[{id:Date.now().toString(),prompt:p,domain:d,createdAt:Date.now()},...v]);showToast("Saved to Vault")}
+  const save=(p:string,d:Domain)=>{setVault(v=>[{id:generateId(),prompt:p,domain:d,createdAt:Date.now()},...v]);showToast("Saved to Vault")}
   const loadChat=(id:string)=>{setActiveId(id);setSidebarOpen(false)}
   const deleteChat=(id:string)=>{setChats(c=>c.filter(x=>x.id!==id)); if(activeId===id){setActiveId(null);setMessages([]);setDomain(null)}}
-  const renameChat=(id:string)=>{if(!editTitle.trim()) return; setChats(c=>c.map(x=>x.id===id?{...x,title:editTitle.trim()}:x));setEditingId(null)}
+  const renameChat=(id:string)=>{if(!editTitle.trim()){ setEditingId(null); return } setChats(c=>c.map(x=>x.id===id?{...x,title:editTitle.trim()}:x));setEditingId(null)}
 
   const now=Date.now()
-  const today=chats.filter(c=> now - c.updatedAt < 86400000)
-  const week=chats.filter(c=> now - c.updatedAt >=86400000 && now - c.updatedAt < 7*86400000)
-  const older=chats.filter(c=> now - c.updatedAt >= 7*86400000)
+  const filteredBySearch=searchQuery.trim() ? chats.filter(c=>{
+    const q=searchQuery.toLowerCase()
+    return c.title.toLowerCase().includes(q) || (c.domain||"").toLowerCase().includes(q) || c.messages.some(m=>m.text.toLowerCase().includes(q))
+  }) : chats
+  const today=filteredBySearch.filter(c=> now - c.updatedAt < 86400000)
+  const week=filteredBySearch.filter(c=> now - c.updatedAt >=86400000 && now - c.updatedAt < 7*86400000)
+  const older=filteredBySearch.filter(c=> now - c.updatedAt >= 7*86400000)
 
   const handleAuth=()=>{
     if(!authEmail || !authPass || (authTab==='signup' && !authName)){ showToast("Fill all fields"); return}
@@ -220,7 +260,7 @@ export default function App(){
   }
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-[#0a0f1e] text-slate-100 flex flex-col relative">
+    <div className="h-screen w-screen overflow-hidden bg-[#0a0f1e] text-slate-100 flex flex-col relative">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 opacity-[0.55]" style={{background:`radial-gradient(800px circle at 15% 10%, rgba(139,92,246,0.18), transparent 60%), radial-gradient(700px circle at 90% 20%, rgba(56,189,248,0.14), transparent 60%), radial-gradient(900px circle at 50% 90%, rgba(99,102,241,0.10), transparent 70%)`}} />
         <div className="absolute -top-40 -right-40 w-[700px] h-[700px] bg-violet-600/18 blur-[120px] rounded-full animate-pulse_glow"/>
@@ -270,11 +310,11 @@ export default function App(){
                 <ShimmerButton onClick={newChat} className="w-full justify-center !rounded-2xl"><Plus size={16}/>+ New Chat</ShimmerButton>
                 <div className="mt-3 relative">
                   <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"/>
-                  <input placeholder="Search chats" className="w-full glass-subtle rounded-full pl-9 pr-3 py-2.5 text-xs placeholder:text-slate-500 outline-none focus:border-violet-500/40 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] transition"/>
+                  <input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search chats" className="w-full glass-subtle rounded-full pl-9 pr-3 py-2.5 text-xs placeholder:text-slate-500 outline-none focus:border-violet-500/40 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] transition"/>
                 </div>
               </div>
               <div className="relative flex-1 overflow-y-auto px-3 pb-4 space-y-5">
-                {chats.length===0 ? <p className="text-xs text-slate-500 text-center mt-10 glass-subtle rounded-2xl py-6 mx-2 border border-white/5">No chats yet. Start a new prompt.</p> : (
+                {filteredBySearch.length===0 ? <p className="text-xs text-slate-500 text-center mt-10 glass-subtle rounded-2xl py-6 mx-2 border border-white/5">{chats.length===0?"No chats yet. Start a new prompt.":"No matches for \""+searchQuery+"\""}</p> : (
                   <div className="space-y-5">
                     {[["Today",today],["Previous 7 Days",week],["Older",older] as const].map(([label,list]:any)=> list.length>0 && (
                       <div key={label as string}>
@@ -284,7 +324,7 @@ export default function App(){
                             <div key={c.id} className={cn("group flex items-center gap-2 px-3 py-3 rounded-2xl border cursor-pointer transition-all", activeId===c.id?'bg-white text-slate-900 border-white shadow-lg scale-[1.01]':'glass-subtle border-white/10 hover:bg-white/[0.07] hover:border-white/15 text-slate-300 hover:translate-x-0.5')}>
                               <button onClick={()=>loadChat(c.id)} className="flex-1 text-left min-w-0">
                                 {editingId===c.id ? (
-                                  <input autoFocus value={editTitle} onChange={e=>setEditTitle(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') renameChat(c.id); if(e.key==='Escape') setEditingId(null)}} onBlur={()=>setEditingId(null)} className="w-full bg-transparent outline-none text-xs border-b border-slate-400"/>
+                                  <input autoFocus value={editTitle} onChange={e=>setEditTitle(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') renameChat(c.id); if(e.key==='Escape') setEditingId(null)}} onBlur={()=>renameChat(c.id)} className="w-full bg-transparent outline-none text-xs border-b border-slate-400"/>
                                 ) : (
                                   <>
                                     <div className="text-xs font-medium truncate">{c.title}</div>
@@ -315,8 +355,8 @@ export default function App(){
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex-1 flex flex-col max-w-[920px] w-full mx-auto min-h-0 overflow-hidden">
-        <div ref={listRef} className="chat-scroll scrollbar-none flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth px-4 sm:px-6 py-8 space-y-5 min-h-0">
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col max-w-[920px] w-full mx-auto overflow-hidden">
+        <div ref={listRef} className="chat-scroll scrollbar-none h-[calc(100vh-140px)] overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-8 space-y-5">
           {messages.length===0 ? (
             <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={spring} className="flex flex-col items-center text-center flex-1 justify-center py-6 sm:py-10 w-full">
               <motion.div initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} transition={{...spring,delay:0.05}} className="inline-flex items-center gap-2 glass-subtle rounded-full px-3 py-1.5 text-[11px] border border-white/10 mb-6">
@@ -349,22 +389,22 @@ export default function App(){
                       <BorderBeam size={180} duration={10} colorFrom="#8b5cf6" colorTo="#38bdf8" />
                       <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-slate-100"><BoldText text={m.text} domain={m.domain} /></p>
                       {m.clarify && (
-                        <motion.div variants={stagger} initial="initial" animate="animate" className="mt-4 space-y-4">
+                        <motion.div variants={stagger} initial="initial" animate="animate" className={cn("mt-4 space-y-4", m.clarifyConsumed && "opacity-60 pointer-events-none")}>
                           {m.clarify.map((q,qi)=>(
                             <motion.div key={qi} variants={fadeUp} transition={spring} className="glass-subtle rounded-2xl p-3.5 border border-white/5">
-                              <div className="text-sm font-medium text-slate-100">{qi+1}. {q.question}</div>
+                              <div className="text-sm font-medium text-slate-100">{qi+1}. {q.question} {m.clarifyConsumed && <span className="ml-2 text-xs text-slate-500">(answered)</span>}</div>
                               <motion.div variants={stagger} className="flex flex-wrap gap-2 mt-2.5">
                                 {(q.pills || (q as any).answers || (q as any).options || []).map((p:string)=>(
-                                  <motion.button key={p} variants={fadeUp} whileHover={{scale:1.04,y:-1}} whileTap={{scale:0.97}} transition={spring} onClick={()=>pickPill(qi,p)} className={cn("px-3.5 py-1.5 rounded-full text-xs border transition shadow-sm", clarifyAnswers[qi]===p?'bg-white text-slate-900 border-white font-medium shadow-lg':'glass hover:bg-white/10 border-white/10 text-slate-300')}>{p}</motion.button>
+                                  <motion.button key={p} variants={fadeUp} whileHover={m.clarifyConsumed?{}:{scale:1.04,y:-1}} whileTap={m.clarifyConsumed?{}:{scale:0.97}} transition={spring} disabled={!!m.clarifyConsumed} onClick={()=>!m.clarifyConsumed && pickPill(qi,p)} className={cn("px-3.5 py-1.5 rounded-full text-xs border transition shadow-sm", clarifyAnswers[qi]===p?'bg-white text-slate-900 border-white font-medium shadow-lg':'glass hover:bg-white/10 border-white/10 text-slate-300', m.clarifyConsumed && "opacity-50 cursor-not-allowed")}>{p}</motion.button>
                                 ))}
                               </motion.div>
                             </motion.div>
                           ))}
-                          <ShimmerButton onClick={handleCompile} className="w-full sm:w-auto justify-center"><Sparkle size={14}/> Generate Blueprint <Send size={14}/></ShimmerButton>
+                          <ShimmerButton onClick={handleCompile} disabled={!!m.clarifyConsumed} className={cn("w-full sm:w-auto justify-center", m.clarifyConsumed && "opacity-50 pointer-events-none")}>{m.clarifyConsumed ? "Blueprint generated" : <><Sparkle size={14}/> Generate Blueprint <Send size={14}/></>}</ShimmerButton>
                         </motion.div>
                       )}
                       {m.result && (
-                        <ResultCard result={m.result} domain={m.domain as Domain} onCopy={copy} onSave={save} onRegenerate={handleRegenerate} tweakFor={tweakFor} setTweakFor={setTweakFor} tweakInput={tweakInput} setTweakInput={setTweakInput} onTweak={(p)=>handleTweak(m.id,p)} />
+                        <ResultCard messageId={m.id} result={m.result} domain={m.domain as Domain} onCopy={copy} onSave={save} onRegenerate={handleRegenerate} tweakFor={tweakFor} setTweakFor={setTweakFor} tweakInputs={tweakInputs} setTweakInputs={setTweakInputs} onTweak={handleTweak} />
                       )}
                     </MagicCard>
                   )}
@@ -450,12 +490,12 @@ export default function App(){
   )
 }
 
-function ResultCard({result,domain,onCopy,onSave,onRegenerate,tweakFor,setTweakFor,tweakInput,setTweakInput,onTweak}:{result:any;domain:Domain;onCopy:(s:string)=>void;onSave:(s:string,d:Domain)=>void;onRegenerate:()=>void;tweakFor:string|null;setTweakFor:(s:string|null)=>void;tweakInput:string;setTweakInput:(s:string)=>void;onTweak:(p:string)=>void}){
+function ResultCard({messageId,result,domain,onCopy,onSave,onRegenerate,tweakFor,setTweakFor,tweakInputs,setTweakInputs,onTweak}:{messageId:string;result:any;domain:Domain;onCopy:(s:string)=>void;onSave:(s:string,d:Domain)=>void;onRegenerate:()=>void;tweakFor:string|null;setTweakFor:(s:string|null)=>void;tweakInputs:Record<string,string>;setTweakInputs:React.Dispatch<React.SetStateAction<Record<string,string>>>;onTweak:(id:string,prompt:string)=>void}){
   const [open,setOpen]=useState(false)
   const [copied,setCopied]=useState(false)
   const doCopy=()=>{onCopy(result.prompt);setCopied(true);setTimeout(()=>setCopied(false),1500)}
-  const id=result.prompt.slice(0,20)
-  const isTweaking=tweakFor===id
+  const isTweaking=tweakFor===messageId
+  const curInput=tweakInputs[messageId]||""
   return (
     <div className="mt-4">
       <div className="glass !rounded-2xl overflow-hidden border border-white/10 relative">
@@ -469,13 +509,13 @@ function ResultCard({result,domain,onCopy,onSave,onRegenerate,tweakFor,setTweakF
       <div className="flex flex-wrap gap-2 mt-3">
         <ShimmerButton onClick={doCopy} className="!px-4 !py-2 text-xs">{copied ? <><Check size={14}/> Copied</> : <>📋 Copy Prompt</>}</ShimmerButton>
         <motion.button whileHover={{scale:1.03,y:-1}} whileTap={{scale:0.97}} transition={spring} onClick={onRegenerate} className="px-4 py-2 rounded-full glass-subtle border border-white/10 text-xs flex items-center gap-1.5 hover:bg-white/10">🔄 Regenerate</motion.button>
-        <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} transition={spring} onClick={()=> isTweaking ? setTweakFor(null) : setTweakFor(id)} className={cn("px-4 py-2 rounded-full border text-xs flex items-center gap-1.5 transition", isTweaking?'bg-violet-600 border-violet-600 text-white shadow-lg shadow-violet-600/20':'glass-subtle border-white/10 hover:bg-white/10')}><Pencil size={12}/> Tweak</motion.button>
+        <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} transition={spring} onClick={()=> isTweaking ? setTweakFor(null) : setTweakFor(messageId)} className={cn("px-4 py-2 rounded-full border text-xs flex items-center gap-1.5 transition", isTweaking?'bg-violet-600 border-violet-600 text-white shadow-lg shadow-violet-600/20':'glass-subtle border-white/10 hover:bg-white/10')}><Pencil size={12}/> Tweak</motion.button>
         <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} transition={spring} onClick={()=>onSave(result.prompt,domain!)} className="px-4 py-2 rounded-full glass-subtle border border-white/10 text-xs flex items-center gap-1.5 hover:bg-white/10">💾 Save to Vault</motion.button>
       </div>
       <AnimatePresence>{isTweaking && (
         <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}} transition={spring} className="mt-3 flex gap-2 glass-subtle border border-white/10 rounded-2xl p-2 overflow-hidden">
-          <input value={tweakInput} onChange={e=>setTweakInput(e.target.value)} placeholder="e.g., make it more minimal, add dark mode..." className="flex-1 bg-transparent outline-none text-sm px-3 placeholder:text-slate-500"/>
-          <ShimmerButton onClick={()=>onTweak(result.prompt)} className="!py-1.5 text-xs !px-4">Apply</ShimmerButton>
+          <input value={curInput} onChange={e=>setTweakInputs(p=>({...p,[messageId]:e.target.value}))} placeholder="e.g., make it more minimal, add dark mode..." className="flex-1 bg-transparent outline-none text-sm px-3 placeholder:text-slate-500"/>
+          <ShimmerButton onClick={()=>onTweak(messageId,result.prompt)} className="!py-1.5 text-xs !px-4">Apply</ShimmerButton>
         </motion.div>
       )}</AnimatePresence>
       <motion.button whileTap={{scale:0.97}} transition={spring} onClick={()=>setOpen(!open)} className="mt-3 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200">Why this works (CREATE Breakdown) <motion.span animate={{rotate:open?180:0}} transition={spring}><ChevronDown size={14}/></motion.span></motion.button>
