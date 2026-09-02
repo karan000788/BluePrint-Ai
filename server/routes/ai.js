@@ -3,7 +3,7 @@ const axios = require('axios');
 
 const router = express.Router();
 
-const getOllamaUrl = () => process.env.OLLAMA_HOST || process.env.OLLAMA_URL || 'http://localhost:11434';
+const getOllamaUrl = () => process.env.OLLAMA_HOST || process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
 const getActiveModel = async () => {
   try {

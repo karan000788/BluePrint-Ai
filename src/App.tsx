@@ -143,17 +143,13 @@ export default function App(){
     const next=[nm]; setMessages(next); persistMessages(next,d)
   }
   const handleSend = async (text?: string) => {
-    setHasStarted(true);
     const idea = (text || input).trim();
     if (!idea) return;
-    
+    setHasStarted(true);
     let currentDomain = domain || ("code" as Domain);
     if (!domain) setDomain(currentDomain);
-    
     if (generations >= 10) { showToast("Free limit reached — upgrade to Pro"); return; }
-
     const chatIdToUse = activeId || generateId();
-    
     const userMsg: Message = { id: generateId(), role: "user", text: idea, domain: currentDomain };
     setMessages(prev => {
       const next = [...prev, userMsg];
@@ -166,10 +162,8 @@ export default function App(){
       });
       return next;
     });
-    
     if (!activeId) setActiveId(chatIdToUse);
     setInput(""); setPendingIdea(idea); setClarifyAnswers([]);
-
     try {
       const qs = await generateClarify(idea, currentDomain);
       const validQs = qs && qs.length ? qs : contextualClarify(idea, currentDomain);
@@ -177,16 +171,13 @@ export default function App(){
         question: q.question || "Could you clarify?",
         pills: (q.pills && q.pills.length ? q.pills : ["Option A", "Option B", "Option C"])
       }));
-      
       const bot: Message = { id: generateId(), role: "assistant", text: "Got it — a couple quick questions to make it perfect:", clarify: safeQs };
-      
       setMessages(prev => {
         const finalMessages = [...prev, bot];
         setChats(oldChats => oldChats.map(c => c.id === chatIdToUse ? { ...c, messages: finalMessages, updatedAt: Date.now() } : c));
         return finalMessages;
       });
       setTimeout(() => scrollToBottom(true), 100);
-      
     } catch (e) {
       console.warn("API failed, using fallback.", e);
       const fallback = contextualClarify(idea, currentDomain);
@@ -194,9 +185,7 @@ export default function App(){
         question: q.question,
         pills: (q.pills && q.pills.length ? q.pills : ["Option A", "Option B", "Option C"])
       }));
-      
       const bot: Message = { id: generateId(), role: "assistant", text: "Got it — a couple quick questions to make it perfect:", clarify: safeQs };
-      
       setMessages(prev => {
         const finalMessages = [...prev, bot];
         setChats(oldChats => oldChats.map(c => c.id === chatIdToUse ? { ...c, messages: finalMessages, updatedAt: Date.now() } : c));
@@ -357,8 +346,8 @@ export default function App(){
         )}
       </AnimatePresence>
 
-      <div className="flex-1 min-h-0 relative z-10 flex flex-col w-full max-w-[920px] mx-auto overflow-hidden">
-        <div ref={listRef} className="chat-scroll scrollbar-none flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-8 space-y-5">
+      <div className="relative z-10 flex flex-col w-full max-w-[920px] mx-auto h-[calc(100vh-120px)]">
+        <div ref={listRef} className="chat-scroll scrollbar-none h-full overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-8 space-y-5">
           {!hasStarted ? (
             <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={spring} className="flex flex-col items-center text-center flex-1 justify-center py-6 sm:py-10 w-full">
               <motion.div initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} transition={{...spring,delay:0.05}} className="inline-flex items-center gap-2 glass-subtle rounded-full px-3 py-1.5 text-[11px] border border-white/10 mb-6">
