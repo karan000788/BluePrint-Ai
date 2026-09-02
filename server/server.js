@@ -21,7 +21,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     success: true,
     db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    ollama: process.env.OLLAMA_HOST || process.env.OLLAMA_URL || 'http://localhost:11434'
+    ollama: process.env.OLLAMA_HOST || process.env.OLLAMA_URL || 'http://127.0.0.1:11434'
   });
 });
 
