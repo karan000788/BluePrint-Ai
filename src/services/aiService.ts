@@ -159,7 +159,7 @@ export async function generateClarify(idea:string, domain:Domain):Promise<Clarif
         const r=await fetch(`${local}/api/generate`,{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"llama3",prompt:`clarify non-technical ${domain}: ${idea}`,stream:false}),
+          body:JSON.stringify({model:"deepseek-r1:1.5b",prompt:`clarify non-technical ${domain}: ${idea}`,stream:false}),
           signal: controller.signal
         })
         clearTimeout(timeoutId);

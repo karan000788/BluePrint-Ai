@@ -10,7 +10,7 @@ const getActiveModel = async () => {
     const { data } = await axios.get(`${getOllamaUrl()}/api/tags`);
     if (data.models?.length) return data.models[0].name;
   } catch {}
-  return process.env.OLLAMA_MODEL || 'llama3';
+  return process.env.OLLAMA_MODEL || 'deepseek-r1:1.5b';
 };
 
 const callOllama = async (prompt, { format } = {}) => {
