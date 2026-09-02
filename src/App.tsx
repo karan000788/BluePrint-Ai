@@ -88,6 +88,7 @@ export default function App(){
   const [authEmail,setAuthEmail]=useState("")
   const [authPass,setAuthPass]=useState("")
   const [authName,setAuthName]=useState("")
+  const [hasStarted,setHasStarted]=useState(false)
   const [editingId,setEditingId]=useState<string|null>(null)
   const [editTitle,setEditTitle]=useState("")
   const listRef=useRef<HTMLDivElement>(null)
@@ -113,7 +114,7 @@ export default function App(){
   useEffect(()=>{
     if(activeId){
       const c=chats.find(x=>x.id===activeId)
-      if(c){ setMessages(c.messages); setDomain(c.domain) }
+      if(c){ setMessages(c.messages); setDomain(c.domain); setHasStarted(c.messages.length>0) }
     }
   },[activeId])
 
@@ -133,15 +134,16 @@ export default function App(){
     const id=generateId()
     const ns:ChatSession={id,title:"New chat",domain:null,messages:[],createdAt:Date.now(),updatedAt:Date.now()}
     setChats(prev=>[ns,...prev]); setActiveId(id)
-    setMessages([]);setDomain(null);setPendingIdea("");setClarifyAnswers([]);setStreamText("");setTweakFor(null);setTweakInputs({})
+    setMessages([]);setDomain(null);setPendingIdea("");setClarifyAnswers([]);setStreamText("");setTweakFor(null);setTweakInputs({});setHasStarted(false)
     setSidebarOpen(false)
   }
   const handleCategory=(d:Domain)=>{
-    setDomain(d)
+    setDomain(d); setHasStarted(true)
     const nm:Message={id:"w",role:"assistant",text:`Great — ${d} mode activated. Describe your idea and I'll craft a hyper-detailed CREATE prompt.`,domain:d}
     const next=[nm]; setMessages(next); persistMessages(next,d)
   }
   const handleSend = async (text?: string) => {
+    setHasStarted(true);
     const idea = (text || input).trim();
     if (!idea) return;
     
@@ -153,16 +155,16 @@ export default function App(){
     const chatIdToUse = activeId || generateId();
     
     const userMsg: Message = { id: generateId(), role: "user", text: idea, domain: currentDomain };
-    const nextMessages = [...messages, userMsg];
-    
-    setMessages(nextMessages);
-    
-    setChats(prev => {
-      const exists = prev.find(c => c.id === chatIdToUse);
-      if (!exists) {
-        return [{ id: chatIdToUse, title: idea.slice(0, 38), domain: currentDomain, messages: nextMessages, createdAt: Date.now(), updatedAt: Date.now() }, ...prev];
-      }
-      return prev.map(c => c.id === chatIdToUse ? { ...c, messages: nextMessages, domain: currentDomain, updatedAt: Date.now() } : c);
+    setMessages(prev => {
+      const next = [...prev, userMsg];
+      setChats(cPrev => {
+        const exists = cPrev.find(c => c.id === chatIdToUse);
+        if (!exists) {
+          return [{ id: chatIdToUse, title: idea.slice(0, 38), domain: currentDomain, messages: next, createdAt: Date.now(), updatedAt: Date.now() }, ...cPrev];
+        }
+        return cPrev.map(c => c.id === chatIdToUse ? { ...c, messages: next, domain: currentDomain, updatedAt: Date.now() } : c);
+      });
+      return next;
     });
     
     if (!activeId) setActiveId(chatIdToUse);
@@ -355,9 +357,9 @@ export default function App(){
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col max-w-[920px] w-full mx-auto overflow-hidden">
-        <div ref={listRef} className="chat-scroll scrollbar-none h-[calc(100vh-140px)] overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-8 space-y-5">
-          {messages.length===0 ? (
+      <div className="flex-1 min-h-0 relative z-10 flex flex-col w-full max-w-[920px] mx-auto overflow-hidden">
+        <div ref={listRef} className="chat-scroll scrollbar-none flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-8 space-y-5">
+          {!hasStarted ? (
             <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={spring} className="flex flex-col items-center text-center flex-1 justify-center py-6 sm:py-10 w-full">
               <motion.div initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} transition={{...spring,delay:0.05}} className="inline-flex items-center gap-2 glass-subtle rounded-full px-3 py-1.5 text-[11px] border border-white/10 mb-6">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" /> Powered by CREATE framework • Beta 2.0
