@@ -1,7 +1,7 @@
 {
-  "name": "blueprint-ai-server",
+  "name": "oto-ai-server",
   "version": "1.0.0",
-  "description": "Blueprint AI - Express backend with MongoDB & Ollama",
+  "description": "Oto AI - Express backend with MongoDB & Ollama",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

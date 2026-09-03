@@ -38,7 +38,7 @@ router.post('/clarify', async (req, res) => {
   const rawIdea = (idea || message || '').trim();
   if (!rawIdea) return res.status(400).json({ success: false, message: 'idea/message is required' });
 
-  const prompt = `You are Blueprint AI, a friendly prompt-engineering assistant.
+  const prompt = `You are Oto AI, a friendly prompt-engineering assistant.
 
 Task: Decide if the user input is a prompt-creation request or a general conversational question.
 
@@ -81,7 +81,7 @@ router.post('/generate', async (req, res) => {
       : JSON.stringify(answers)
     : context || 'No additional answers provided.';
 
-  const prompt = `You are Blueprint AI, an expert prompt engineer.
+  const prompt = `You are Oto AI, an expert prompt engineer.
 
 User's original idea: """${rawIdea}"""
 

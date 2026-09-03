@@ -14,7 +14,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/', (req, res) => {
-  res.json({ success: true, message: 'Blueprint AI API running', version: '1.0.0' });
+  res.json({ success: true, message: 'Oto AI API running', version: '1.0.0' });
 });
 
 app.get('/api/health', (req, res) => {
@@ -36,5 +36,5 @@ app.use((err, req, res, next) => {
 });
 
 connectDB().then(() => {
-  app.listen(PORT, () => console.log(`Blueprint AI server running on http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`Oto AI server running on http://localhost:${PORT}`));
 });

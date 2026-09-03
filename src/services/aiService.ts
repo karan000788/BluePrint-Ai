@@ -134,7 +134,7 @@ export async function generateClarify(idea:string, domain:Domain):Promise<Clarif
         const r=await fetch("https://api.openai.com/v1/chat/completions",{
           method:"POST",
           headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json"},
-          body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:`You are Blueprint AI clarification engine. CRITICAL RULES: 1) Read the user's exact idea and make questions SPECIFIC to it. 2) NEVER ask generic developer questions like "What is your tech stack?" "Write a CRUD app?" "API only?" 3) Always 2-3 simple, non-technical, human-friendly questions a 12-year-old would understand. 4) Each question must reference what they typed. 5) Pills are short click-options (2-3 words) plain English. Return ONLY JSON array [{question,pills:[]}] for domain ${domain}.`},{role:"user",content:idea}],temperature:0.8}),
+          body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:`You are Oto AI clarification engine. CRITICAL RULES: 1) Read the user's exact idea and make questions SPECIFIC to it. 2) NEVER ask generic developer questions like "What is your tech stack?" "Write a CRUD app?" "API only?" 3) Always 2-3 simple, non-technical, human-friendly questions a 12-year-old would understand. 4) Each question must reference what they typed. 5) Pills are short click-options (2-3 words) plain English. Return ONLY JSON array [{question,pills:[]}] for domain ${domain}.`},{role:"user",content:idea}],temperature:0.8}),
           signal: controller.signal
         })
         clearTimeout(timeoutId);
@@ -151,7 +151,7 @@ export async function generateClarify(idea:string, domain:Domain):Promise<Clarif
       }catch{}
     }
     
-    const local=localStorage.getItem("blueprint_endpoint")
+    const local=localStorage.getItem("oto_endpoint")
     if(local){
       try{
         const controller = new AbortController();
@@ -184,7 +184,7 @@ export async function generateFinal(idea:string, domain:Domain, answers:string[]
   const key=import.meta.env.VITE_OPENAI_KEY
   if(key){
     try{
-      const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:"You are Blueprint AI CREATE engine. Output JSON {prompt,breakdown:{context,role,execution,constraints,target}} hyper-detailed but non-technical where possible. Prompt must be copy-paste ready."},{role:"user",content:`idea:${idea} domain:${domain} answers:${answers.join(",")}`}],temperature:0.85})})
+      const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:"You are Oto AI CREATE engine. Output JSON {prompt,breakdown:{context,role,execution,constraints,target}} hyper-detailed but non-technical where possible. Prompt must be copy-paste ready."},{role:"user",content:`idea:${idea} domain:${domain} answers:${answers.join(",")}`}],temperature:0.85})})
       const j=await r.json()
       const c=j.choices?.[0]?.message?.content
       if(c) return JSON.parse(c.replace(/```json|```/g,""))
