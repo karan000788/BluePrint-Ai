@@ -16,6 +16,7 @@ const CATEGORIES = [
   { id: "image" as Domain, label: "Photo & Image Prompt", emoji: "🎨", desc: "Midjourney, DALL·E, Flux", grad: "from-[#B25730] to-[#D97A4D]", glow: "rgba(178,87,48,0.35)" },
   { id: "code" as Domain, label: "Code & Text Prompt", emoji: "💻", desc: "Cursor, Claude, ChatGPT", grad: "from-[#B25730] to-[#D97A4D]", glow: "rgba(178,87,48,0.35)" },
 ]
+const HERO_HEADLINES = ["What can I help you build today?", "What prompt are we refining?", "Let's engineer your next great idea"] as const
 function BoldText({ text, domain }: { text: string; domain?: Domain }) {
   const parts = text.split(/(\*\*.*?\*\*)/g)
   return <>{parts.map((p, i) => {
@@ -73,10 +74,18 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
+  const [heroHeadline, setHeroHeadline] = useState(() => HERO_HEADLINES[Math.floor(Math.random() * HERO_HEADLINES.length)])
   const listRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
   const createMenuRefBottom = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+  const attachMenuRef = useRef<HTMLDivElement>(null)
+  const attachMenuRefBottom = useRef<HTMLDivElement>(null)
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { setAttachedFile(f); showToast(`Attached ${f.name}`); setAttachMenuOpen(false) } }
+  const clearFile = () => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = "" }
   const { listening, toggle } = useSpeech(t => setInput(t))
 
   const scrollToBottom = (smooth = true) => {
@@ -99,6 +108,17 @@ export default function App() {
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
   }, [createMenuOpen])
+  useEffect(() => {
+    if (!attachMenuOpen) return
+    const h = (e: MouseEvent) => {
+      const t = e.target as Node
+      const inTop = attachMenuRef.current?.contains(t)
+      const inBottom = attachMenuRefBottom.current?.contains(t)
+      if (!inTop && !inBottom) setAttachMenuOpen(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [attachMenuOpen])
   useEffect(() => {
     scrollToBottom(true)
   }, [messages, streamText])
@@ -137,6 +157,7 @@ export default function App() {
     setChats(prev => [ns, ...prev]); setActiveId(id)
     setMessages([]); setDomain(null); setPendingIdea(""); setClarifyAnswers([]); setStreamText(""); setTweakFor(null); setTweakInputs({}); setHasStarted(false); setCreateMenuOpen(false)
     setSidebarOpen(false)
+    setHeroHeadline(HERO_HEADLINES[Math.floor(Math.random() * HERO_HEADLINES.length)])
   }
   // @ts-ignore - retained for domain logic
   const handleCategory = (d: Domain) => {
@@ -283,6 +304,7 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#1E1E1E] text-[#ECECEC] flex flex-col relative">
+      <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
 
       <header className="sticky top-0 z-20 flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-[#2E2E2E] bg-[#1E1E1E] w-full !rounded-none !border-x-0 !border-t-0 shrink-0">
         <div className="flex items-center gap-2">
@@ -311,39 +333,43 @@ export default function App() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/50" />
             <motion.div initial={{ x: -340 }} animate={{ x: 0 }} exit={{ x: -340 }} transition={{ duration: 0.2 }} className="fixed left-0 top-0 bottom-0 z-40 w-[340px] bg-[#1E1E1E] !rounded-none !border-y-0 !border-l-0 flex flex-col overflow-hidden border-r border-[#2E2E2E]">
-              <div className="relative p-4 flex items-center justify-between border-b border-[#2E2E2E]">
-                <span className="font-semibold flex items-center gap-2 text-[#ECECEC]"><span className="w-7 h-7 rounded-lg bg-[#262625] flex items-center justify-center border border-[#2E2E2E]"><History size={14} /></span> History</span>
-                <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#262625] hover:bg-[#2E2E2E] border border-[#2E2E2E]"><X size={14} /></button>
-              </div>
-              <div className="relative p-3">
-                <button onClick={newChat} className="w-full justify-center rounded-xl py-2.5 px-4 bg-[#B25730] hover:bg-[#8F441F] text-white font-medium flex items-center gap-2"><Plus size={16} />+ New Chat</button>
-                <div className="mt-3 relative">
-                  <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A9A98]" />
-                  <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search chats" className="w-full bg-[#262625] rounded-full pl-9 pr-3 py-2.5 text-xs placeholder:text-[#9A9A98] outline-none border border-[#2E2E2E] focus:border-[#B25730]" />
+              <div className="flex items-center justify-between px-4 py-3.5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-md hover:bg-[#262625] text-[#9A9A98] hover:text-[#ECECEC]"><X size={16} /></button>
+                  <span className="text-[13px] font-medium tracking-wide text-[#ECECEC]">Oto AI</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="p-1.5 rounded-md hover:bg-[#262625] text-[#9A9A98] hover:text-[#ECECEC]"><Search size={14} /></button>
+                  <button className="p-1.5 rounded-md hover:bg-[#262625] text-[#9A9A98] hover:text-[#ECECEC]"><Edit2 size={14} /></button>
                 </div>
               </div>
-              <div className="relative flex-1 overflow-y-auto px-3 pb-4 space-y-5">
-                {filteredBySearch.length === 0 ? <p className="text-xs text-[#9A9A98] text-center mt-10 bg-[#262625] rounded-xl py-6 mx-2 border border-[#2E2E2E]">{chats.length === 0 ? "No chats yet. Start a new prompt." : "No matches for \"" + searchQuery + "\""}</p> : (
-                  <div className="space-y-5">
+              <div className="px-3 pb-3 space-y-3 shrink-0">
+                <button onClick={newChat} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#262625] hover:bg-[#2E2E2E] border border-[#2E2E2E] text-[13px] font-medium text-[#ECECEC] transition-colors"><span className="w-6 h-6 rounded-full bg-[#B25730] flex items-center justify-center shrink-0"><Plus size={12} className="text-white" /></span> New chat</button>
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6B6B6B]" />
+                  <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search chats..." className="w-full bg-[#262625] rounded-lg pl-8 pr-3 py-2 text-[13px] placeholder:text-[#6B6B6B] outline-none border border-transparent focus:border-[#2E2E2E] focus:bg-[#262625] text-[#ECECEC]" />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-6 scrollbar-none">
+                {filteredBySearch.length === 0 ? <p className="text-[13px] text-[#6B6B6B] text-center mt-10 px-4">{chats.length === 0 ? "No chats yet." : "No matches for \"" + searchQuery + "\""}</p> : (
+                  <div className="space-y-6">
                     {[["Today", today], ["Previous 7 Days", week], ["Older", older] as const].map(([label, list]: any) => list.length > 0 && (
                       <div key={label as string}>
-                        <div className="text-[10px] tracking-[0.16em] text-[#9A9A98] font-semibold mb-2 px-2">{label as string}</div>
-                        <div className="space-y-1.5">
+                        <div className="text-[11px] font-medium text-[#6B6B6B] mb-2 px-2">{label as string}</div>
+                        <div className="space-y-0.5">
                           {list.map((c: ChatSession) => (
-                            <div key={c.id} className={cn("group flex items-center gap-2 px-3 py-3 rounded-xl border cursor-pointer", activeId === c.id ? 'bg-[#B25730] text-white border-[#8F441F]' : 'bg-[#262625] border-[#2E2E2E] hover:bg-[#2E2E2E] text-[#ECECEC]')}>
+                            <div key={c.id} className={cn("group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-colors", activeId === c.id ? 'bg-[#262625] text-[#ECECEC]' : 'text-[#9A9A98] hover:bg-[#262625]/60 hover:text-[#ECECEC]')}>
+                              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", activeId === c.id ? 'bg-[#B25730]' : 'bg-[#3a3a3a] group-hover:bg-[#6B6B6B]')} />
                               <button onClick={() => loadChat(c.id)} className="flex-1 text-left min-w-0">
                                 {editingId === c.id ? (
-                                  <input autoFocus value={editTitle} onChange={e => setEditTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') renameChat(c.id); if (e.key === 'Escape') setEditingId(null) }} onBlur={() => renameChat(c.id)} className="w-full bg-transparent outline-none text-xs border-b border-[#9A9A98]" />
+                                  <input autoFocus value={editTitle} onChange={e => setEditTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') renameChat(c.id); if (e.key === 'Escape') setEditingId(null) }} onBlur={() => renameChat(c.id)} className="w-full bg-transparent outline-none text-[13px] border-b border-[#3a3a3a] text-[#ECECEC]" />
                                 ) : (
-                                  <>
-                                    <div className="text-xs font-medium truncate">{c.title}</div>
-                                    <div className={cn("text-[11px] truncate", activeId === c.id ? 'text-white/80' : 'text-[#9A9A98]')}>{c.domain || "no domain"} • {new Date(c.updatedAt).toLocaleDateString()}</div>
-                                  </>
+                                  <span className="text-[13px] font-normal truncate block leading-none">{c.title}</span>
                                 )}
                               </button>
-                              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100">
-                                <button onClick={() => { setEditingId(c.id); setEditTitle(c.title) }} className={cn("p-1.5 rounded-lg border", activeId === c.id ? 'hover:bg-black/10 border-transparent' : 'hover:bg-[#1E1E1E] border-transparent')}><Edit2 size={12} /></button>
-                                <button onClick={() => deleteChat(c.id)} className={cn("p-1.5 rounded-lg border", activeId === c.id ? 'hover:bg-black/10 border-transparent' : 'hover:bg-[#1E1E1E] border-transparent hover:text-red-400')}><Trash2 size={12} /></button>
+                              <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => { setEditingId(c.id); setEditTitle(c.title) }} className="p-1 rounded-md hover:bg-[#1E1E1E] text-[#6B6B6B] hover:text-[#ECECEC]"><Edit2 size={12} /></button>
+                                <button onClick={() => deleteChat(c.id)} className="p-1 rounded-md hover:bg-[#1E1E1E] text-[#6B6B6B] hover:text-red-400"><Trash2 size={12} /></button>
                               </div>
                             </div>
                           ))}
@@ -354,9 +380,9 @@ export default function App() {
                 )}
               </div>
               {user && (
-                <div className="relative p-3 border-t border-[#2E2E2E] flex items-center justify-between bg-[#262625] !rounded-none !border-x-0 !border-b-0">
-                  <div className="flex items-center gap-2.5 min-w-0"><div className="w-8 h-8 rounded-full bg-[#B25730] flex items-center justify-center text-xs font-bold border border-[#8F441F]">{user.name.slice(0, 1).toUpperCase()}</div><div className="min-w-0"><div className="text-xs font-medium truncate text-[#ECECEC]">{user.name}</div><div className="text-[11px] text-[#9A9A98] truncate">{user.email}</div></div></div>
-                  <button onClick={() => setUser(null)} className="p-2 rounded-lg bg-[#1E1E1E] hover:bg-[#2E2E2E] border border-[#2E2E2E]"><LogOut size={14} /></button>
+                <div className="p-3 border-t border-[#2E2E2E] flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0"><div className="w-7 h-7 rounded-full bg-[#B25730] flex items-center justify-center text-[11px] font-bold border border-[#8F441F] text-white">{user.name.slice(0, 1).toUpperCase()}</div><div className="min-w-0"><div className="text-[13px] font-medium truncate text-[#ECECEC] leading-none">{user.name}</div><div className="text-[11px] text-[#6B6B6B] truncate">{user.email}</div></div></div>
+                  <button onClick={() => setUser(null)} className="p-1.5 rounded-md hover:bg-[#262625] text-[#6B6B6B] hover:text-[#ECECEC]"><LogOut size={14} /></button>
                 </div>
               )}
             </motion.div>
@@ -365,26 +391,61 @@ export default function App() {
       </AnimatePresence>
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col w-full max-w-[920px] mx-auto overflow-hidden">
-        <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-8 chat-scroll scrollbar-none">
+        <div ref={listRef} className={cn("flex-1 min-h-0 overflow-x-hidden px-4 sm:px-6 chat-scroll scrollbar-none h-full", hasStarted ? "overflow-y-auto py-8" : "overflow-hidden flex flex-col justify-center py-4")}>
           {!hasStarted ? (
-            <div className="flex flex-col items-center text-center flex-1 justify-center py-10 sm:py-16 w-full max-w-[760px] mx-auto">
-              <img src={bpLogo} alt="Oto AI" className="w-14 h-14 rounded-2xl object-cover border border-[#2E2E2E] shadow-sm mb-6" />
-              <h1 className="font-serif text-[36px] sm:text-[44px] font-light tracking-tight leading-[1.05] text-[#ECECEC]">
-                {user?.name ? `Back at it, ${user.name.split(" ")[0]}` : "Welcome to Oto AI"}
+            <div className="flex flex-col items-center text-center justify-center h-full overflow-hidden py-4 w-full max-w-[760px] mx-auto my-auto">
+              <img src={bpLogo} alt="Oto AI" className="w-12 h-12 rounded-2xl object-cover border border-[#2E2E2E] shadow-sm mb-5" />
+              <p className="text-[#9A9A98] text-[13px] font-light tracking-wide">{user?.name ? `Back at it, ${user.name.split(" ")[0]}` : "Welcome to Oto AI"}</p>
+              <h1 className="font-serif text-[32px] sm:text-[40px] font-light tracking-tight leading-[1.05] text-[#ECECEC] mt-1.5">
+                {heroHeadline}
               </h1>
-              <p className="text-[#9A9A98] mt-2.5 text-[13px] font-light tracking-wide">Better prompts. Brilliant AI Outputs.</p>
-              <p className="text-[#6B6B6B] mt-1 text-[12px]">What can I help you build today?</p>
-              <div className="w-full mt-8 bg-[#262625] border border-[#2E2E2E] rounded-[28px] p-4 sm:p-5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] text-left">
-                <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }} placeholder="How can I help you today?" rows={2} className="w-full bg-transparent outline-none resize-none text-[15px] leading-relaxed placeholder:text-[#6B6B6B] text-[#ECECEC] min-h-[52px] max-h-32" />
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#2E2E2E]/70">
-                  <div className="flex items-center gap-2 relative" ref={createMenuRef}>
-                    <button aria-label="Attach" className="w-8 h-8 rounded-full bg-[#1E1E1E] border border-[#2E2E2E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a] transition-colors"><Plus size={14} /></button>
+              <p className="text-[#9A9A98] mt-2 text-[13px] font-light tracking-wide">Better prompts. Brilliant AI Outputs.</p>
+              <div className="w-full mt-6 bg-[#262625] border border-[#2E2E2E] rounded-[20px] p-3 sm:p-3.5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] text-left relative">
+                {attachedFile && (
+                  <div className="flex items-center gap-2 mb-2 w-fit bg-[#1E1E1E] border border-[#2E2E2E] rounded-full pl-2.5 pr-1 py-1">
+                    <span className="text-[12px] text-[#ECECEC] truncate max-w-[160px]">{attachedFile.name}</span>
+                    <button onClick={clearFile} className="w-5 h-5 rounded-full bg-[#2E2E2E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC]"><X size={10} /></button>
+                  </div>
+                )}
+                <AnimatePresence mode="wait">
+                  {listening ? (
+                    <motion.div key="voice-landing" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.2 }} className="w-full">
+                      <div className="flex items-center gap-3 bg-[#1E1E1E] rounded-full px-3 py-2.5 border border-[#2E2E2E] w-full">
+                        <p className="text-[13px] text-[#ECECEC] leading-relaxed truncate flex-1 min-w-0 text-left">{input || "Listening... speak now"}</p>
+                        <div className="flex items-center gap-[2px] h-6 flex-1 justify-center max-w-[180px]">
+                          {Array.from({ length: 20 }).map((_, i) => (
+                            <motion.span key={i} className="flex-1 max-w-[3px] bg-[#B25730] rounded-full" animate={{ height: [6, 20 + Math.random() * 10, 6] }} transition={{ duration: 0.45 + Math.random() * 0.35, repeat: Infinity, delay: i * 0.03, ease: "easeInOut" }} style={{ height: 10 }} />
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button onClick={() => { toggle(); setInput("") }} aria-label="Cancel recording" className="w-7 h-7 rounded-full bg-[#262625] border border-[#2E2E2E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a]"><X size={12} /></button>
+                          <button onClick={() => { toggle(); if (input.trim()) handleSend() }} aria-label="Submit recording" className="w-7 h-7 rounded-full bg-[#B25730] hover:bg-[#8F441F] flex items-center justify-center text-white"><Check size={12} /></button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="input-landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                      <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }} placeholder="How can I help you today?" rows={1} className="w-full bg-transparent outline-none resize-none text-[15px] leading-relaxed placeholder:text-[#6B6B6B] text-[#ECECEC] min-h-[36px] max-h-24 py-1" />
+                      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#2E2E2E]/70">
+                        <div className="flex items-center gap-2 relative" ref={createMenuRef}>
+                          <div className="relative" ref={attachMenuRef}>
+                            <button onClick={() => setAttachMenuOpen(v => !v)} aria-label="Attach" className="w-8 h-8 rounded-full bg-[#1E1E1E] border border-[#2E2E2E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a] transition-colors"><Plus size={14} /></button>
+                            <AnimatePresence>
+                              {attachMenuOpen && (
+                                <motion.div initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} transition={{ duration: 0.16 }} className="absolute bottom-full left-0 mb-2 w-[220px] bg-[#262625] border border-[#2E2E2E] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.4)] p-1.5 z-50 overflow-hidden">
+                                  <button onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click() }} className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[#2E2E2E] text-[13px] text-[#ECECEC] transition-colors"><span>📎</span> Upload files</button>
+                                  <button onClick={() => { setAttachMenuOpen(false); showToast("Drive not connected") }} className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[#2E2E2E] text-[13px] text-[#ECECEC] transition-colors"><span>💽</span> Add from Drive</button>
+                                  <button onClick={() => { setAttachMenuOpen(false); showToast("More uploads coming soon") }} className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[#2E2E2E] text-[13px] text-[#ECECEC] transition-colors"><span>⋯</span> More uploads</button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                     <button onClick={() => { setDomain(null); setCreateMenuOpen(false); }} className={cn("hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors", !domain ? "bg-[#ECECEC] text-[#1E1E1E] border-[#ECECEC]" : "bg-[#1E1E1E] border-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a]")}>Chat</button>
                     <div className="relative hidden sm:block">
                       <button onClick={() => setCreateMenuOpen(v => !v)} className={cn("inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors", domain ? "bg-[#B25730] text-white border-[#B25730]" : "bg-[#1E1E1E] border-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a]")}>CREATE <ChevronDown size={12} className={cn("transition-transform", createMenuOpen && "rotate-180")} /></button>
                       <AnimatePresence>
                         {createMenuOpen && (
-                          <motion.div initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} transition={{ duration: 0.16 }} className="absolute bottom-full left-0 mb-2 w-[320px] bg-[#262625] border border-[#2E2E2E] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.4)] p-2 z-50 overflow-hidden">
+                          <motion.div initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} transition={{ duration: 0.16 }} className="absolute bottom-[calc(100%+12px)] left-0 z-50 w-[320px] bg-[#262625] border border-[#2E2E2E] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.4)] p-2 overflow-hidden">
                             {CATEGORIES.map(c => (
                               <button key={c.id} onClick={() => { setDomain(c.id); setCreateMenuOpen(false); showToast(`${c.label} selected`) }} className={cn("w-full text-left flex items-start gap-3 px-3 py-3 rounded-xl transition-colors border", domain === c.id ? "bg-[#2E2E2E] border-[#B25730] text-[#ECECEC]" : "bg-transparent border-transparent hover:bg-[#2E2E2E] hover:border-[#2E2E2E] text-[#ECECEC]")}>
                                 <span className="w-9 h-9 rounded-lg bg-[#1E1E1E] border border-[#2E2E2E] flex items-center justify-center text-[16px] shrink-0">{c.emoji}</span>
@@ -407,10 +468,13 @@ export default function App() {
                     <button onClick={() => handleSend()} aria-label="Send" className="w-9 h-9 rounded-full bg-[#B25730] hover:bg-[#8F441F] text-white shrink-0 flex items-center justify-center transition-colors"><Send size={16} /></button>
                   </div>
                 </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               <div className="flex gap-2 mt-5 text-xs flex-wrap justify-center max-w-2xl">
                 {["A cyberpunk street market", "E-commerce shoe store", "Cinematic drone over Iceland"].map(s => (
-                  <button key={s} onClick={() => handleSend(s)} className="px-3.5 py-2 rounded-full bg-[#262625] border border-[#2E2E2E] hover:bg-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC] transition-colors">{s}</button>
+                  <button key={s} onClick={() => { if (!domain) { showToast("Please choose a CREATE option first — select Video, Image, or Code"); setCreateMenuOpen(true); return } handleSend(s) }} className="px-3.5 py-2 rounded-full bg-[#262625] border border-[#2E2E2E] hover:bg-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC] transition-colors">{s}</button>
                 ))}
               </div>
               <p className="text-[11px] text-[#6B6B6B] mt-6">Powered by CREATE framework • Beta 2.0</p>
@@ -461,33 +525,72 @@ export default function App() {
 
         {hasStarted ? (
           <div className="shrink-0 p-4 sm:p-6 bg-[#1E1E1E] pt-6">
-            <div className="bg-[#262625] rounded-xl p-2 flex items-center gap-2 border border-[#2E2E2E] focus-within:border-[#B25730] relative">
-              <div className="hidden sm:flex items-center gap-2 shrink-0" ref={createMenuRefBottom}>
-                <button onClick={() => { setDomain(null); setCreateMenuOpen(false) }} className={cn("px-3 py-2 rounded-full text-xs font-medium border transition-colors", !domain ? "bg-[#ECECEC] text-[#1E1E1E] border-[#ECECEC]" : "bg-[#1E1E1E] border-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC]")}>Chat</button>
-                <div className="relative">
-                  <button onClick={() => setCreateMenuOpen(v => !v)} className={cn("px-3 py-2 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-colors", domain ? "bg-[#B25730] text-white border-[#B25730]" : "bg-[#1E1E1E] border-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC]")}>CREATE <ChevronDown size={12} className={cn("transition-transform", createMenuOpen && "rotate-180")} /></button>
-                  <AnimatePresence>
-                    {createMenuOpen && (
-                      <motion.div initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} transition={{ duration: 0.16 }} className="absolute bottom-full left-0 mb-2 w-[320px] bg-[#262625] border border-[#2E2E2E] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.4)] p-2 z-50 overflow-hidden">
-                        {CATEGORIES.map(c => (
-                          <button key={c.id} onClick={() => { setDomain(c.id); setCreateMenuOpen(false); showToast(`${c.label} selected`) }} className={cn("w-full text-left flex items-start gap-3 px-3 py-3 rounded-xl transition-colors border", domain === c.id ? "bg-[#2E2E2E] border-[#B25730] text-[#ECECEC]" : "bg-transparent border-transparent hover:bg-[#2E2E2E] text-[#ECECEC]")}>
-                            <span className="w-9 h-9 rounded-lg bg-[#1E1E1E] border border-[#2E2E2E] flex items-center justify-center text-[16px] shrink-0">{c.emoji}</span>
-                            <span className="flex-1 min-w-0">
-                              <span className="text-[13px] font-medium leading-none block">{c.label}</span>
-                              <span className="text-[11px] text-[#9A9A98] leading-tight block mt-1">Optimized for {c.desc}</span>
-                            </span>
-                            {domain === c.id && <span className="w-2 h-2 rounded-full bg-[#B25730] mt-2 shrink-0" />}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                {domain && <span className="text-[11px] text-[#D97A4D] capitalize hidden lg:inline-flex items-center gap-1"><Settings2 size={10} />{domain}</span>}
+            {attachedFile && (
+              <div className="flex items-center gap-2 mb-2 w-fit bg-[#262625] border border-[#2E2E2E] rounded-full pl-2.5 pr-1 py-1">
+                <span className="text-[12px] text-[#ECECEC] truncate max-w-[160px]">{attachedFile.name}</span>
+                <button onClick={clearFile} className="w-5 h-5 rounded-full bg-[#1E1E1E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC]"><X size={10} /></button>
               </div>
-              <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }} placeholder={domain ? "Describe your idea — be vague, we'll refine it..." : "How can I help you today?"} rows={1} className="flex-1 bg-transparent outline-none resize-none py-3.5 px-3 text-sm placeholder:text-[#9A9A98] max-h-32 min-h-[44px] text-[#ECECEC]" />
-              <button onClick={toggle} aria-label="Voice input" className={cn("p-3 rounded-full border shrink-0", listening ? 'bg-red-500 border-red-400 text-white' : 'bg-transparent border-transparent hover:bg-[#2E2E2E] text-[#9A9A98]')}><span className="flex items-center justify-center w-5 h-5">{listening ? <MicOff size={18} /> : <Mic size={18} />}</span></button>
-              <button onClick={() => handleSend()} aria-label="Send" className="p-3 rounded-full bg-[#B25730] hover:bg-[#8F441F] text-white shrink-0 flex items-center justify-center"><Send size={18} /></button>
+            )}
+            <div className="bg-[#262625] rounded-xl p-2 border border-[#2E2E2E] focus-within:border-[#B25730] relative">
+              <AnimatePresence mode="wait">
+                {listening ? (
+                  <motion.div key="voice-active" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.2 }} className="w-full p-1">
+                    <div className="flex items-center gap-3 bg-[#1E1E1E] rounded-full px-3 py-2.5 border border-[#2E2E2E] w-full">
+                      <p className="text-[13px] text-[#ECECEC] leading-relaxed truncate flex-1 min-w-0 text-left">{input || "Listening... speak now"}</p>
+                      <div className="flex items-center gap-[2px] h-6 flex-1 justify-center max-w-[180px]">
+                        {Array.from({ length: 20 }).map((_, i) => (
+                          <motion.span key={i} className="flex-1 max-w-[3px] bg-[#B25730] rounded-full" animate={{ height: [6, 20 + Math.random() * 10, 6] }} transition={{ duration: 0.45 + Math.random() * 0.35, repeat: Infinity, delay: i * 0.03, ease: "easeInOut" }} style={{ height: 10 }} />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => { toggle(); setInput("") }} aria-label="Cancel recording" className="w-7 h-7 rounded-full bg-[#262625] border border-[#2E2E2E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a]"><X size={12} /></button>
+                        <button onClick={() => { toggle(); if (input.trim()) handleSend() }} aria-label="Submit recording" className="w-7 h-7 rounded-full bg-[#B25730] hover:bg-[#8F441F] flex items-center justify-center text-white"><Check size={12} /></button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="relative hidden sm:flex shrink-0" ref={attachMenuRefBottom}>
+                      <button onClick={() => setAttachMenuOpen(v => !v)} aria-label="Attach file" className="w-8 h-8 rounded-full bg-[#1E1E1E] border border-[#2E2E2E] flex items-center justify-center text-[#9A9A98] hover:text-[#ECECEC] hover:border-[#3a3a3a]"><Plus size={14} /></button>
+                      <AnimatePresence>
+                        {attachMenuOpen && (
+                          <motion.div initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} transition={{ duration: 0.16 }} className="absolute bottom-full left-0 mb-2 w-[220px] bg-[#262625] border border-[#2E2E2E] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.4)] p-1.5 z-50 overflow-hidden">
+                            <button onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click() }} className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[#2E2E2E] text-[13px] text-[#ECECEC] transition-colors"><span>📎</span> Upload files</button>
+                            <button onClick={() => { setAttachMenuOpen(false); showToast("Drive not connected") }} className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[#2E2E2E] text-[13px] text-[#ECECEC] transition-colors"><span>💽</span> Add from Drive</button>
+                            <button onClick={() => { setAttachMenuOpen(false); showToast("More uploads coming soon") }} className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[#2E2E2E] text-[13px] text-[#ECECEC] transition-colors"><span>⋯</span> More uploads</button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 shrink-0" ref={createMenuRefBottom}>
+                      <button onClick={() => { setDomain(null); setCreateMenuOpen(false) }} className={cn("px-3 py-2 rounded-full text-xs font-medium border transition-colors", !domain ? "bg-[#ECECEC] text-[#1E1E1E] border-[#ECECEC]" : "bg-[#1E1E1E] border-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC]")}>Chat</button>
+                      <div className="relative">
+                        <button onClick={() => setCreateMenuOpen(v => !v)} className={cn("px-3 py-2 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-colors", domain ? "bg-[#B25730] text-white border-[#B25730]" : "bg-[#1E1E1E] border-[#2E2E2E] text-[#9A9A98] hover:text-[#ECECEC]")}>CREATE <ChevronDown size={12} className={cn("transition-transform", createMenuOpen && "rotate-180")} /></button>
+                        <AnimatePresence>
+                          {createMenuOpen && (
+                            <motion.div initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} transition={{ duration: 0.16 }} className="absolute bottom-[calc(100%+12px)] left-0 z-50 w-[320px] bg-[#262625] border border-[#2E2E2E] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.4)] p-2 overflow-hidden">
+                              {CATEGORIES.map(c => (
+                                <button key={c.id} onClick={() => { setDomain(c.id); setCreateMenuOpen(false); showToast(`${c.label} selected`) }} className={cn("w-full text-left flex items-start gap-3 px-3 py-3 rounded-xl transition-colors border", domain === c.id ? "bg-[#2E2E2E] border-[#B25730] text-[#ECECEC]" : "bg-transparent border-transparent hover:bg-[#2E2E2E] text-[#ECECEC]")}>
+                                  <span className="w-9 h-9 rounded-lg bg-[#1E1E1E] border border-[#2E2E2E] flex items-center justify-center text-[16px] shrink-0">{c.emoji}</span>
+                                  <span className="flex-1 min-w-0">
+                                    <span className="text-[13px] font-medium leading-none block">{c.label}</span>
+                                    <span className="text-[11px] text-[#9A9A98] leading-tight block mt-1">Optimized for {c.desc}</span>
+                                  </span>
+                                  {domain === c.id && <span className="w-2 h-2 rounded-full bg-[#B25730] mt-2 shrink-0" />}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      {domain && <span className="text-[11px] text-[#D97A4D] capitalize hidden lg:inline-flex items-center gap-1"><Settings2 size={10} />{domain}</span>}
+                    </div>
+                    <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }} placeholder={domain ? "Describe your idea — be vague, we'll refine it..." : "How can I help you today?"} rows={1} className="flex-1 bg-transparent outline-none resize-none py-3.5 px-3 text-[15px] placeholder:text-[#9A9A98] max-h-32 min-h-[44px] text-[#ECECEC]" />
+                    <button onClick={toggle} aria-label="Voice input" className={cn("p-3 rounded-full border shrink-0", listening ? 'bg-red-500 border-red-400 text-white' : 'bg-transparent border-transparent hover:bg-[#2E2E2E] text-[#9A9A98]')}><span className="flex items-center justify-center w-5 h-5">{listening ? <MicOff size={18} /> : <Mic size={18} />}</span></button>
+                    <button onClick={() => handleSend()} aria-label="Send" className="p-3 rounded-full bg-[#B25730] hover:bg-[#8F441F] text-white shrink-0 flex items-center justify-center"><Send size={18} /></button>
+                  </div>
+                )}
+              </AnimatePresence>
             </div>
             <p className="text-[11px] text-center text-[#9A9A98] mt-2.5">Oto AI can make mistakes. Verify important prompts.</p>
           </div>
